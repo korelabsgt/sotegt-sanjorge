@@ -9,41 +9,12 @@ type ConteoPorLider = {
   familiares: number;
 };
 
-type RpcConteoRow = {
-  lider_id: string;
-  total: number;
-  titulares: number;
-  familiares: number;
-};
-
 const TAM_PAGINA_CONTEO_AFILIADOS = 1000;
 
 async function conteosAfiliadosPorLiderMap(): Promise<
   Map<string, ConteoPorLider>
 > {
   const conteoMap = new Map<string, ConteoPorLider>();
-
-  const rpcRes = await supabaseAdmin.rpc("conteos_afiliados_por_lider");
-
-  if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-    (rpcRes.data as RpcConteoRow[]).forEach((row) => {
-      if (!row.lider_id) return;
-      conteoMap.set(row.lider_id, {
-        total: Number(row.total) || 0,
-        titulares: Number(row.titulares) || 0,
-        familiares: Number(row.familiares) || 0,
-      });
-    });
-    return conteoMap;
-  }
-
-  if (rpcRes.error) {
-    console.error(
-      "RPC conteos_afiliados_por_lider no disponible, usando paginación:",
-      rpcRes.error.message,
-    );
-  }
-
   let desde = 0;
 
   while (true) {
