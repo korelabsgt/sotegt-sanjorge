@@ -85,6 +85,18 @@ export async function obtenerAfiliadosAction(liderId?: string) {
   });
 }
 
+export async function obtenerTotalAfiliadosAction() {
+  const { count, error } = await supabaseAdmin
+    .from("afiliados")
+    .select("*", { count: "exact", head: true });
+
+  if (error) {
+    console.error("Error al obtener total de afiliados:", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 export async function obtenerConteoPadronAction() {
   const supabase = await createClient();
   const { count, error } = await supabase

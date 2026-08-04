@@ -17,7 +17,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { eliminar } from "./acciones";
-import { obtenerConteoPadronAction } from "./actions/afiliados";
+import {
+  obtenerConteoPadronAction,
+  obtenerTotalAfiliadosAction,
+} from "./actions/afiliados";
 import Swal from "sweetalert2";
 
 export interface Lider {
@@ -99,16 +102,19 @@ export default function Lideres({
     refetchOnMount: false,
   });
 
+  const { data: totalAfiliadosGeneral = 0 } = useQuery({
+    queryKey: ["total_afiliados"],
+    queryFn: () => obtenerTotalAfiliadosAction(),
+    staleTime: 60 * 1000,
+    refetchOnMount: false,
+  });
+
   const OBJETIVO_GENERAL = config?.objetivo_total || 0;
   const META_POR_LIDER = config?.meta_por_lider || 0;
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
-
-  const totalAfiliadosGeneral = useMemo(() =>
-    lideres.reduce((acc, curr) => acc + (curr.conteoAfiliados || 0), 0)
-  , [lideres]);
 
   const progresoGeneral = useMemo(() =>
     OBJETIVO_GENERAL > 0 ? Math.min((totalAfiliadosGeneral / OBJETIVO_GENERAL) * 100, 100) : 0

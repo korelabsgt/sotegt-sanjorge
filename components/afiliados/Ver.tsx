@@ -180,6 +180,7 @@ export default function Ver() {
     queryClient.invalidateQueries({ queryKey: ["afiliados-lider"] });
     queryClient.invalidateQueries({ queryKey: ["afiliados-gl"] });
     queryClient.invalidateQueries({ queryKey: ["conteo_padron"] });
+    queryClient.invalidateQueries({ queryKey: ["total_afiliados"] });
   };
 
   const fetchData = async () => {
@@ -261,8 +262,7 @@ export default function Ver() {
 
   const handleSaveAndCloseForm = async () => {
     setIsFormOpen(false);
-    queryClient.invalidateQueries({ queryKey: ["afiliados-lider"] });
-    queryClient.invalidateQueries({ queryKey: ["afiliados-gl"] });
+    invalidateAfiliadosRelatedQueries();
 
     await fetchData();
 

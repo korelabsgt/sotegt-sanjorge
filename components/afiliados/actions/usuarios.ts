@@ -3,6 +3,80 @@
 import { createClient } from "@/utils/supabase/server";
 import supabaseAdmin from "@/utils/supabase/admin";
 
+type ConteoPorLider = {
+  total: number;
+  titulares: number;
+  familiares: number;
+};
+
+type RpcConteoRow = {
+  lider_id: string;
+  total: number;
+  titulares: number;
+  familiares: number;
+};
+
+const TAM_PAGINA_CONTEO_AFILIADOS = 1000;
+
+async function conteosAfiliadosPorLiderMap(): Promise<
+  Map<string, ConteoPorLider>
+> {
+  const conteoMap = new Map<string, ConteoPorLider>();
+
+  const rpcRes = await supabaseAdmin.rpc("conteos_afiliados_por_lider");
+
+  if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+    (rpcRes.data as RpcConteoRow[]).forEach((row) => {
+      if (!row.lider_id) return;
+      conteoMap.set(row.lider_id, {
+        total: Number(row.total) || 0,
+        titulares: Number(row.titulares) || 0,
+        familiares: Number(row.familiares) || 0,
+      });
+    });
+    return conteoMap;
+  }
+
+  if (rpcRes.error) {
+    console.error(
+      "RPC conteos_afiliados_por_lider no disponible, usando paginación:",
+      rpcRes.error.message,
+    );
+  }
+
+  let desde = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from("afiliados")
+      .select("lider_id, familiar_de")
+      .range(desde, desde + TAM_PAGINA_CONTEO_AFILIADOS - 1);
+
+    if (error) throw new Error(error.message);
+
+    const filas = data ?? [];
+    if (!filas.length) break;
+
+    filas.forEach((row) => {
+      if (!row.lider_id) return;
+      const actual = conteoMap.get(row.lider_id) ?? {
+        total: 0,
+        titulares: 0,
+        familiares: 0,
+      };
+      actual.total += 1;
+      if (row.familiar_de) actual.familiares += 1;
+      else actual.titulares += 1;
+      conteoMap.set(row.lider_id, actual);
+    });
+
+    if (filas.length < TAM_PAGINA_CONTEO_AFILIADOS) break;
+    desde += TAM_PAGINA_CONTEO_AFILIADOS;
+  }
+
+  return conteoMap;
+}
+
 export async function listarUsuariosAction(rol_filtro?: string | string[]) {
   const supabase = await createClient();
 
@@ -29,49 +103,16 @@ export async function listarUsuariosAction(rol_filtro?: string | string[]) {
     }
   }
 
-  const [perfilesRes, authRes, rpcRes] = await Promise.all([
+  const [perfilesRes, authRes, conteoMap] = await Promise.all([
     filtroPerfiles,
     supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }).catch(() => ({ data: { users: [] } })),
-    supabase.rpc("conteos_afiliados_por_lider"),
+    conteosAfiliadosPorLiderMap(),
   ]);
 
   if (perfilesRes.error) throw new Error(perfilesRes.error.message);
 
   const perfiles = perfilesRes.data || [];
   const users = (authRes as any)?.data?.users || [];
-
-  const conteoMap = new Map<string, { total: number; titulares: number; familiares: number }>();
-
-  type RpcRow = { lider_id: string; total: number; titulares: number; familiares: number };
-  const rpcOk = !rpcRes.error && Array.isArray(rpcRes.data);
-
-  if (rpcOk) {
-    (rpcRes.data as RpcRow[]).forEach((row) => {
-      if (row.lider_id) {
-        conteoMap.set(row.lider_id, {
-          total: Number(row.total) || 0,
-          titulares: Number(row.titulares) || 0,
-          familiares: Number(row.familiares) || 0,
-        });
-      }
-    });
-  } else {
-    const conteoRes = await supabase.from("afiliados").select("lider_id, familiar_de");
-    if (conteoRes.error) throw new Error(conteoRes.error.message);
-    const conteoRaw = conteoRes.data || [];
-    conteoRaw.forEach((row) => {
-      if (row.lider_id) {
-        const current = conteoMap.get(row.lider_id) || { total: 0, titulares: 0, familiares: 0 };
-        current.total++;
-        if (row.familiar_de) {
-          current.familiares++;
-        } else {
-          current.titulares++;
-        }
-        conteoMap.set(row.lider_id, current);
-      }
-    });
-  }
 
   const userMap = new Map(users.map((u: any) => [u.id, u.email]));
 
